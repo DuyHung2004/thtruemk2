@@ -7,14 +7,16 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
-import org.springframework.web.reactive.function.client.WebClientResponseException;
+import org.telegram.telegrambots.meta.TelegramBotsApi;
+import org.telegram.telegrambots.meta.exceptions.TelegramApiException;
+import org.telegram.telegrambots.updatesreceivers.DefaultBotSession;
 
-import java.io.BufferedWriter;
-import java.io.FileWriter;
-import java.io.IOException;
+import java.io.*;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
 import java.util.Random;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
+import java.util.Scanner;
 
 @SpringBootApplication
 @Slf4j
@@ -22,85 +24,126 @@ public class Application implements CommandLineRunner {
 
     @Autowired
     private MyService myService;  // Inject MyService từ Spring Context
+    @Autowired
+    private Bot bot;
 
     public static void main(String[] args) {
         SpringApplication.run(Application.class, args);  // Khởi chạy Spring Boot
     }
 
     @Override
-    public void run(String... args) {
-        // Tạo một ExecutorService với 10 luồng
-        ExecutorService executorService = Executors.newFixedThreadPool(5);
+    public void run(String... args) throws TelegramApiException {
+        TelegramBotsApi botsApi = new TelegramBotsApi(DefaultBotSession.class);
+        try {
+            botsApi.registerBot(bot); // Đăng ký bot
+        } catch (TelegramApiException e) {
+            log.error("Lỗi khi đăng ký bot: " + e.getMessage());
+        }
+    }
+    public String naptien(String input){
+        while(true){
+            String[] mangsdt = tachsdt(input);
+            for (String sdt : mangsdt) {
+                boolean check = true;
+                int n=0;
+                while (check) {
+                    String macode = getCodeFromFile();  // Lấy mã từ file luucode2
+                    n++;
+                    if (macode == null || macode.isEmpty()) {
+                        log.info("Không còn mã code nào trong file luucode2.");
+                        check = false;
+                        continue;
+                    }
 
-        // Khởi chạy 10 luồng thực hiện tác vụ
-        for (int i = 0; i < 5; i++) {
-            executorService.submit(() -> {
-                while (true) { // Thực hiện vòng lặp
+                    String name = generateRandomName();
+                    threquest request = new threquest(name, macode, sdt);
                     try {
-                        String randomPhone = generateRandomPhoneNumber();
-                        String randomString = generateRandomString();
-                        threquest request = new threquest(randomString, randomPhone);
                         String code = myService.sendPostRequest(request);
-                        log.info(randomString);
-                        log.info(code);
-                        // Kiểm tra code và lưu chuỗi vào file nếu điều kiện thỏa mãn
-                        if (code.equals("success")) {
-                            saveStringToFile(randomString, "luucode2.txt");
+                        switch (code) {
+                            case "4":
+                                log.info("Đã nạp 10k vào số {} ", sdt);
+                                check = false;
+                                break;
+                            case "3":
+                                log.info("Đã nạp 20k vào số {}", sdt);
+                                check = false;
+                                break;
+                            case "null":
+                                log.info("{} không trúng", sdt);
+                                if(n>=5){
+                                    check = false;
+                                }
+                                break;
+                            default:
+                                log.info("Đã trúng xe đạp hoặc laptop");
+                                log.info(macode);
+                                saveCodeToFile(macode, "luucode3.txt");  // Lưu vào luucode3 nếu trúng
+                                check = false;
+                                break;
                         }
-                    } catch (WebClientResponseException e) {
-                        // Kiểm tra lỗi 403
-                        if (e.getStatusCode().value() == 429) {
-                            System.err.println("Lỗi 429: Tạm dừng 3 giây trước khi tiếp tục...");
-                            try {
-                                Thread.sleep(3000); // Dừng 3 giây nếu gặp lỗi 403
-                            } catch (InterruptedException ex) {
-                                Thread.currentThread().interrupt(); // Khôi phục trạng thái interrupt
-                                throw new RuntimeException(ex);
-                            }
-                        } else {
-                            System.err.println("Lỗi trong vòng lặp: " + e.getMessage());
-                        }
-                    } catch (Exception e) {
-                        System.err.println("Lỗi trong vòng lặp: " + e.getMessage());
+                        deleteCodeFromFile("luucode2.txt", macode);
+                    } catch (InterruptedException e) {
+                        throw new RuntimeException(e);
                     }
                 }
-            });
-        }
-
-        // Tùy vào nhu cầu của bạn có thể gọi executorService.shutdown() khi không cần chạy nữa
+            }}
     }
-
-
-    public static String generateRandomPhoneNumber() {
-        String[] phonePrefixes = {"090", "091", "092", "093", "094", "095", "096", "097", "098", "099"};
-        Random random = new Random();
-        int index = random.nextInt(phonePrefixes.length);
-        String prefix = phonePrefixes[index];
-        int numberPart = random.nextInt(1000000, 10000000);
-        return prefix + numberPart;
-    }
-
-    public static String generateRandomString() {
-        String chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
-        Random random = new Random();
-        StringBuilder result = new StringBuilder(9);
-        String prefix = random.nextBoolean() ? "TY4" : "YE4";
-        result.append(prefix);
-        for (int i = 0; i < 6; i++) {
-            int index = random.nextInt(chars.length());
-            result.append(chars.charAt(index));
-        }
-
-        return result.toString();
-    }
-
-    public static void saveStringToFile(String randomString, String fileName) {
-        try (BufferedWriter writer = new BufferedWriter(new FileWriter(fileName, true))) {
-            writer.write(randomString);
-            writer.newLine();
-            System.out.println("Chuỗi đã được lưu vào file: " + fileName);
+    // Hàm đọc mã từ file luucode2
+    private String getCodeFromFile() {
+        try (BufferedReader reader = new BufferedReader(new FileReader("luucode2.txt"))) {
+            return reader.readLine();  // Đọc dòng đầu tiên
         } catch (IOException e) {
-            System.err.println("Lỗi khi lưu vào file: " + e.getMessage());
+            log.error("Lỗi khi đọc từ file luucode2: " + e.getMessage());
+            return null;
         }
+    }
+
+    // Hàm xóa mã code khỏi file luucode2
+    private void deleteCodeFromFile(String fileName, String codeToDelete) {
+        Path inputFilePath = Path.of(fileName);
+        Path tempFilePath = Path.of("tempfile.txt");
+
+        try (BufferedReader reader = Files.newBufferedReader(inputFilePath);
+             BufferedWriter writer = Files.newBufferedWriter(tempFilePath)) {
+
+            String currentLine;
+            while ((currentLine = reader.readLine()) != null) {
+                if (!currentLine.equals(codeToDelete)) {
+                    writer.write(currentLine);
+                    writer.newLine();
+                }
+            }
+
+            Files.deleteIfExists(inputFilePath); // Xóa file cũ
+            Files.move(tempFilePath, inputFilePath, StandardCopyOption.REPLACE_EXISTING); // Đổi tên file tạm
+
+        } catch (IOException e) {
+            log.error("Lỗi khi xóa mã khỏi file: " + e.getMessage());
+        }
+    }
+
+    // Hàm lưu mã code vào file luucode3
+    private void saveCodeToFile(String macode, String fileName) {
+        try (BufferedWriter writer = new BufferedWriter(new FileWriter(fileName, true))) {
+            writer.write(macode);
+            writer.newLine();
+            log.info("Mã đã được lưu vào file: " + fileName);
+        } catch (IOException e) {
+            log.error("Lỗi khi lưu vào file: " + e.getMessage());
+        }
+    }
+
+    public static String[] tachsdt(String input) {
+        return splitStringToArray(input);
+    }
+
+    public static String[] splitStringToArray(String input) {
+        return input.split("\\s+"); // Tách bằng khoảng trắng
+    }
+
+    public static String generateRandomName() {
+        String[] names = {"Hung", "Mai", "Lan", "Bich", "Nam", "Tuan", "Anh", "Hoa", "Minh", "Duy"};
+        Random random = new Random();
+        return names[random.nextInt(names.length)];
     }
 }
