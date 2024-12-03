@@ -55,6 +55,11 @@
             <artifactId>spring-boot-starter-test</artifactId>
             <scope>test</scope>
         </dependency>
+        <dependency>
+            <groupId>org.jsoup</groupId>
+            <artifactId>jsoup</artifactId>
+            <version>1.15.3</version> <!-- Kiểm tra phiên bản mới nhất trên trang Jsoup -->
+        </dependency>
     </dependencies>
 
     <build>
