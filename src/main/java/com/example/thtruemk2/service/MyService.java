@@ -152,7 +152,7 @@ public class MyService {
                     .bodyValue(value)
                     .retrieve()
                     .bodyToMono(JsonNode.class)
-                    .timeout(Duration.ofSeconds(10))
+                    .timeout(Duration.ofSeconds(5))
                     .map(jsonNode -> {
                         JsonNode Type = jsonNode.get("Type");
                         return (Type != null) ? Type.asText() : "";

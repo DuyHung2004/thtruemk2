@@ -17,9 +17,8 @@ import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
+import java.util.concurrent.*;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 @SpringBootApplication
 @Slf4j
@@ -38,6 +37,8 @@ public class Application implements CommandLineRunner {
 
         while (true) { // Vòng lặp để chạy lại 10 luồng
             getproxy();
+            AtomicBoolean firstThreadCompleted = new AtomicBoolean(false);
+            ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor();
             // Tạo một ExecutorService với 10 luồng
             ExecutorService executorService = Executors.newFixedThreadPool(10);
             CountDownLatch latch = new CountDownLatch(10); // Đảm bảo đợi tất cả luồng hoàn thành
@@ -67,6 +68,7 @@ public class Application implements CommandLineRunner {
                                     saveStringToFile(randomString, "luucode2.txt");
                                 }
                             } catch (WebClientResponseException e) {
+                                log.error("Lỗi trong khi gửi request: {}, Status Code: {}", e.getMessage(), e.getStatusCode().value());
                                 // Kiểm tra lỗi 403
                             } catch (Exception e) {
                                 log.error("Lỗi trong khi gửi request: {}", e.getMessage());
@@ -79,6 +81,13 @@ public class Application implements CommandLineRunner {
                             }
                             Thread.sleep(200); // Thời gian chờ giữa các lần gửi request
                         }
+                        if (firstThreadCompleted.compareAndSet(false, true)) {
+                            log.info("Luồng {} là luồng đầu tiên hoàn thành!", finalI);
+                            scheduler.schedule(() -> {
+                                log.info("10 giây đã trôi qua. Dừng tất cả luồng còn lại!");
+                                executorService.shutdownNow(); // Dừng tất cả luồng
+                            }, 5, TimeUnit.SECONDS);
+                        }
                     } catch (InterruptedException e) {
                         log.error("Lỗi trong quá trình thực thi luồng: {}", e.getMessage());
                     } finally {
@@ -89,20 +98,13 @@ public class Application implements CommandLineRunner {
 
             // Chờ tất cả 10 luồng hoàn thành
             try {
-                latch.await(); // Chờ tất cả 10 luồng hoàn thành
-                log.info("Hoàn thành 10 luồng, bắt đầu chạy lại...");
+                latch.await(); // Chờ cho tới khi tất cả luồng hoàn thành
+                log.info("Tất cả luồng đã hoàn thành hoặc bị dừng!");
             } catch (InterruptedException e) {
-                log.error("Lỗi khi chờ các luồng hoàn thành: {}", e.getMessage());
-            }
-
-            // Đảm bảo tắt ExecutorService sau khi hoàn thành
-            executorService.shutdown();
-            try {
-                if (!executorService.awaitTermination(60, java.util.concurrent.TimeUnit.SECONDS)) {
-                    executorService.shutdownNow();
-                }
-            } catch (InterruptedException e) {
-                log.error("Lỗi khi tắt ExecutorService: {}", e.getMessage());
+                log.error("Quá trình đợi luồng bị gián đoạn: {}", e.getMessage());
+            } finally {
+                executorService.shutdown(); // Đảm bảo tắt ExecutorService
+                scheduler.shutdown(); // Đảm bảo tắt Scheduler
             }
         }
     }
