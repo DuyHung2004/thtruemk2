@@ -40,11 +40,11 @@ public class Application implements CommandLineRunner {
             AtomicBoolean firstThreadCompleted = new AtomicBoolean(false);
             ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor();
             // Tạo một ExecutorService với 10 luồng
-            ExecutorService executorService = Executors.newFixedThreadPool(10);
-            CountDownLatch latch = new CountDownLatch(10); // Đảm bảo đợi tất cả luồng hoàn thành
+            ExecutorService executorService = Executors.newFixedThreadPool(20);
+            CountDownLatch latch = new CountDownLatch(20); // Đảm bảo đợi tất cả luồng hoàn thành
 
             // Khởi chạy 10 luồng thực hiện tác vụ
-            for (int i = 0; i < 10; i++) {
+            for (int i = 0; i < 20; i++) {
                 int finalI = i;
                 executorService.submit(() -> {
                     try {
@@ -56,7 +56,7 @@ public class Application implements CommandLineRunner {
                                 String randomString = generateRandomString();
                                 threquest request = new threquest(randomString, randomPhone);
 
-                                myService.configureWebClient2(proxyList.get(10 * dem + finalI));
+                                myService.configureWebClient2(proxyList.get(20 * dem + finalI));
                                 String code = myService.sendPostRequest(request);
                                 if (code.isEmpty()) {
                                     code = "khong co gia tri";
@@ -157,7 +157,7 @@ public class Application implements CommandLineRunner {
         String chars = "ACDEFHKMNOPRTUWXY23479";
         Random random = new Random();
         StringBuilder result = new StringBuilder(9);
-        result.append("TY4");
+        result.append("YE4");
         for (int i = 0; i < 6; i++) {
             int index = random.nextInt(chars.length());
             result.append(chars.charAt(index));
@@ -183,7 +183,7 @@ public class Application implements CommandLineRunner {
         WebClient webClient2 = WebClient.builder().build();
         ExecutorService executor = Executors.newFixedThreadPool(40); // Giới hạn 40 luồng
         CountDownLatch latch = new CountDownLatch(40); // Đếm ngược 40 tác vụ
-        for(int k=0;k<=2;k++){
+        for(int k=0;k<=5;k++){
             int h=k;
         for (int i = 0; i < 40; i++) {
             int j = i;
